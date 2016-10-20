@@ -6,19 +6,20 @@
 (function( root, factory ) {
 	if (typeof define === 'function' && define.amd) {
 		root.marked = require( './marked' );
-		root.RevealMarkdown = factory( root.marked );
+		root.markdownit = require( './markdown-it' );
+		root.RevealMarkdown = factory( root.marked, root.markdownit );
 		root.RevealMarkdown.initialize();
 	} else if( typeof exports === 'object' ) {
-		module.exports = factory( require( './marked' ) );
+		module.exports = factory( require( './marked', './markdown-it' ) );
 	} else {
 		// Browser globals (root is window)
-		root.RevealMarkdown = factory( root.marked );
+		root.RevealMarkdown = factory( root.marked, root.markdownit );
 		root.RevealMarkdown.initialize();
 	}
-}( this, function( marked ) {
+}( this, function( marked, markdownIt ) {
 
-	if( typeof marked === 'undefined' ) {
-		throw 'The reveal.js Markdown plugin requires marked to be loaded';
+	if( typeof marked === 'undefined' && typeof markdownIt === 'undefined' ) {
+		throw 'The reveal.js markdown plugin requires marked or markdown-it to be loaded';
 	}
 
 	if( typeof hljs !== 'undefined' ) {
@@ -29,6 +30,9 @@
 		});
 	}
 
+	var MARKDOWN_IT = markdownIt ? new markdownIt({html: true}) : null;
+	var USE_MARKDOWN_IT = typeof markdownIt !== 'undefined';
+
 	var DEFAULT_SLIDE_SEPARATOR = '^\r?\n---\r?\n$',
 		DEFAULT_NOTES_SEPARATOR = 'note:',
 		DEFAULT_ELEMENT_ATTRIBUTES_SEPARATOR = '\\\.element\\\s*?(.+?)$',
@@ -36,6 +40,18 @@
 
 	var SCRIPT_END_PLACEHOLDER = '__SCRIPT_END__';
 
+
+	/**
+	 * Converts markdown to DOM elements with either marked or markdown-it.
+	 */
+	function markdownToHTML(markdown) {
+		
+		if(USE_MARKDOWN_IT) {
+			return MARKDOWN_IT.render(markdown);
+		} else {
+			return marked(markdown);
+		} 
+	}
 
 	/**
 	 * Retrieves the markdown contents of a slide section
@@ -120,7 +136,7 @@
 		var notesMatch = content.split( new RegExp( options.notesSeparator, 'mgi' ) );
 
 		if( notesMatch.length === 2 ) {
-			content = notesMatch[0] + '<aside class="notes">' + marked(notesMatch[1].trim()) + '</aside>';
+			content = notesMatch[0] + '<aside class="notes">' + markdownToHTML(notesMatch[1].trim()) + '</aside>';
 		}
 
 		// prevent script end tags in the content from interfering
@@ -367,7 +383,8 @@
 				var notes = section.querySelector( 'aside.notes' );
 				var markdown = getMarkdownFromSlide( section );
 
-				section.innerHTML = marked( markdown );
+				section.innerHTML = markdownToHTML(markdown);
+
 				addAttributes( 	section, section, null, section.getAttribute( 'data-element-attributes' ) ||
 								section.parentNode.getAttribute( 'data-element-attributes' ) ||
 								DEFAULT_ELEMENT_ATTRIBUTES_SEPARATOR,
@@ -384,7 +401,6 @@
 			}
 
 		}
-
 	}
 
 	// API
